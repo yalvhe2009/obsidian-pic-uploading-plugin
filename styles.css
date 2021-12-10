@@ -1,4 +1,7 @@
-/* Sets all the text color to red! */
-body {
-    color: red;
+.p-t-s {
+    padding-top: 10px;
+}
+
+.pic-uploading-plugin-input1{
+    width: 80%;
 }
