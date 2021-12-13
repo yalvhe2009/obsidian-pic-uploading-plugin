@@ -3,6 +3,9 @@ import { PUOss, PUOssUploadInput } from './interfaces';
 import { ClipBoardHelper, ClipBoardReadOutput } from './clipBoardHelper';
 import { CloudServiceProviderType } from './enums';
 import { OssFactory } from './ossFactory';
+import { FileNameOrPathHelper, GetFileNameByRuleInput } from './fileNameHelper';
+import {Md5} from "md5-typescript";
+import file2md5 from 'file2md5';
 
 
 
@@ -71,15 +74,31 @@ export default class PicUploadingPlugin extends Plugin {
 				let doc = markdownView.editor.getDoc();
 				console.log('当前Markdown路径为：', markdownView.file.path)
 			}
-
+			
 			let readImageOutput: ClipBoardReadOutput = await ClipBoardHelper.readImage();
-			let file = readImageOutput.file;
-			console.log('读取到的文件为', file);
+			let file: Blob = readImageOutput.file;
+			let file2: File = new File([file], 'PasteFile.png', {type: 'image/png', lastModified: Date.now()});
+			let md5Val =  await file2md5(file2, {chunkSize: 3 * 1024 * 1024});
+			// console.log('Md5值为：', md5Val);
+			
+			let getFileNameByRuleInput: GetFileNameByRuleInput = {
+				rule: this.settings.fileNameFormat,
+				imgPath: '',//当前版本暂不实现
+				markdownPath: markdownView.file.path,
+				originFileName: 'PasteFile.png',//稍后填充
+				fileMd5: md5Val,
+			};
+
+			//把规则转换为文件路径
+			let fileName = FileNameOrPathHelper.getFileNameOrPathByRule(getFileNameByRuleInput);
+			// console.log('读取到的文件为', file);
+			console.log(`上传前文件名为：${fileName}`);
+			
 
 			if (file) {
 				let ossUploadInput: PUOssUploadInput = {
 					file: file,
-					fileName: 'defaultClipboardFileName'
+					fileName: fileName
 				};
 				new Notice(`Start to upload file!`);
 				let ossUploadOutput = await this.ossUploadImpl.upload(ossUploadInput);
@@ -216,6 +235,18 @@ class PicUploadingSettingTab extends PluginSettingTab {
 			});
 
 			new Setting(containerEl)
+			.setName('paste automatically after upload')
+			.setDesc('If you set it true, this plugin will paste markdown image text after upload.')
+			.addDropdown(dropdown => {
+				dropdown.addOption('true', 'true');
+				dropdown.addOption('false', 'false');
+				dropdown.onChange(async val => {
+					this.plugin.settings.isAutoPaste = val;
+					await this.plugin.saveSettings();
+				});
+			});
+
+			new Setting(containerEl)
 			.setName('rename before upload')
 			.setDesc('If you set it true, this plugin will popup a dialog that you can change the filename.')
 			.addDropdown(dropdown => {
@@ -228,13 +259,12 @@ class PicUploadingSettingTab extends PluginSettingTab {
 			});
 
 			new Setting(containerEl)
-			.setName('paste automatically after upload')
-			.setDesc('If you set it true, this plugin will paste markdown image text after upload.')
-			.addDropdown(dropdown => {
-				dropdown.addOption('true', 'true');
-				dropdown.addOption('false', 'false');
-				dropdown.onChange(async val => {
-					this.plugin.settings.isAutoPaste = val;
+			.setName('File name foramt')
+			.setDesc('')
+			.addText(text =>{
+				text.setValue(this.plugin.settings.fileNameFormat)
+				.onChange(async val =>{
+					this.plugin.settings.fileNameFormat = val;
 					await this.plugin.saveSettings();
 				});
 			});
