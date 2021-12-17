@@ -7,7 +7,7 @@ export interface GetFileNameByRuleInput {
     rule: string;
 
     /**
-     * 原文件名（不含后缀）
+     * 原文件名（含后缀）
      */
     originFileName: string;
 
@@ -35,7 +35,12 @@ export class FileNameOrPathHelper {
         //注意：当前版本暂不支持{picFolder:2}，因其需要考虑不同操作系统，环境不支持，暂不实现
         //rule传入格式样例：fix-dir/{currMarkdownFolder:2}{picFolder:2}/{y}/{m}/{d}/{h}-{i}-{s}-{hash}-{origin}-{rand:6}
 
-        console.log('处理currMarkdownFolder前的rule：', input.rule);
+        let originFileName = FileNameOrPathHelper.getFileNameExcludeSuffix(input.originFileName);
+		let fileSuffix = FileNameOrPathHelper.getFileSuffix(input.originFileName);
+        
+        console.log('原始文件名和文件后缀：', `${originFileName}哈哈${fileSuffix}`);
+        
+        //console.log('处理currMarkdownFolder前的rule：', input.rule);
 
         //1.查找{currMarkdownFolder}或{currMarkdownFolder:x}
         const regex = /\{currMarkdownFolder(:)?(\d)?\}/gm;
@@ -44,29 +49,29 @@ export class FileNameOrPathHelper {
             if (m.index === regex.lastIndex) {
                 regex.lastIndex++;
             }
-            console.log('匹配到的项目：', m);
+            //console.log('匹配到的项目：', m);
             if (m.length != 0 && m[0] === '{currMarkdownFolder}') {
                 //只匹配到了{currMarkdownFolder}
                 let s1 = input.rule.substring(0, m.index);
                 let s2 = input.rule.substring(m.index + m[0].length);
                 let markdownBasePath = FileNameOrPathHelper.getPath(input.markdownPath);//把全路径转换为去掉文件名的路径
-                console.log('markDown的基础路径（不含文件名）：', markdownBasePath);
+                //console.log('markDown的基础路径（不含文件名）：', markdownBasePath);
 
                 let tem1 = this.joinPath(s1, markdownBasePath);
                 let tem2 = this.joinPath(tem1, s2);
                 input.rule = tem2;
-                console.log('Rule为：', input.rule);
+                //console.log('Rule为：', input.rule);
             } else {
                 //匹配到了：{currMarkdownFolder:x}
                 let num: number = parseInt(m[2]);//num 表示：{currMarkdownFolder:x}中的x的值
                 let p = this.getLastNLevelPath(input.markdownPath, num);
-                console.log(`获取到倒数${num}级的路径为：`, p);
+                //console.log(`获取到倒数${num}级的路径为：`, p);
                 let s1 = input.rule.substring(0, m.index);
                 let s2 = input.rule.substring(m.index + m[0].length);
                 let tem1 = this.joinPath(s1, p);
                 let tem2 = this.joinPath(tem1, s2);
                 input.rule = tem2;
-                console.log('Rule为：', input.rule);
+                //console.log('Rule为：', input.rule);
             }
         }
 
@@ -84,7 +89,7 @@ export class FileNameOrPathHelper {
         let minute: number = date.getMinutes();
         let second: number = date.getSeconds();
 
-        console.log(`${year}, ${month}, ${day}, ${hour}, ${minute}, ${second}`);
+        //console.log(`${year}, ${month}, ${day}, ${hour}, ${minute}, ${second}`);
         //{y}/{m}/{d}/{h}-{i}-{s}
         input.rule = input.rule.replace('{y}', `${year}`);
         input.rule = input.rule.replace('{m}', `${month}`);
@@ -93,8 +98,8 @@ export class FileNameOrPathHelper {
         input.rule = input.rule.replace('{i}', `${minute}`);
         input.rule = input.rule.replace('{s}', `${second}`);
         input.rule = input.rule.replace('{hash}', `${input.fileMd5}`);
-        input.rule = input.rule.replace('{origin}', `${input.originFileName}`);
-        console.log('时间信息替换完成的路径', input.rule);
+        input.rule = input.rule.replace('{origin}', `${originFileName}`);
+        //console.log('时间信息替换完成的路径', input.rule);
         //{rand:x}
 
         const regex2 = /\{rand:(\d)\}/gm;
@@ -103,7 +108,7 @@ export class FileNameOrPathHelper {
             if (m2.index === regex2.lastIndex) {
                 regex2.lastIndex++;
             }
-            console.log('匹配到的项目：', m2);
+            //console.log('匹配到的项目：', m2);
             //匹配到了：{rand:x}
             let num: number = parseInt(m2[1]);//num 表示：{rand:x}中的x的值
             if(num <=0 || num > 10){
@@ -111,15 +116,17 @@ export class FileNameOrPathHelper {
             }
             let randMin = (10)**(num - 1);
             let randMax = (9.999999999)*(10)**(num - 1);
-            console.log(`${randMin}, ${randMax}`);
+            //console.log(`${randMin}, ${randMax}`);
             
             let randNum: Number = this.getRandomNum(randMin, randMax);//num位数
             let s1 = input.rule.substring(0, m2.index);
             let s2 = input.rule.substring(m2.index + m2[0].length);
             input.rule = s1 + `${randNum}`+ s2;
-            console.log('Rule为：', input.rule);
+            //console.log('Rule为：', input.rule);
 
         }
+
+        input.rule = input.rule + '.' + fileSuffix;
 
         return input.rule;
     }
@@ -133,7 +140,7 @@ export class FileNameOrPathHelper {
     public static getLastNLevelPath(path: string, n: number, sep = '/'): string {
         let resList: string[] = [];
         let s = path.split(sep);//['', 'home', 'domenic', 'img', '1.jpg']
-        console.log('s为：', s);
+        //console.log('s为：', s);
 
         for (let i = s.length - 2; i >= 0; i--) {//从倒数第二个开始遍历
             const item = s[i];
@@ -152,7 +159,7 @@ export class FileNameOrPathHelper {
             resList2.push(item);
         }
         let res = resList2.join('/');
-        console.log(res);
+        //console.log(res);
         return res;
     }
 
@@ -181,7 +188,6 @@ export class FileNameOrPathHelper {
             path2 = path2.substring(1);
         }
         res = path1 + sep + path2;
-        console.log('拼接好的字符串为：', res);
 
         return res;
     }
@@ -204,6 +210,41 @@ export class FileNameOrPathHelper {
     }
 
     /**
+     * 输入文件名，获取不含后缀的文件名；如'abc.jpg'=> 'abc'
+     * @param fileName 
+     * @returns 
+     */
+    public static getFileNameExcludeSuffix(fileName: string): string{
+        if (fileName.length == 0) {
+            return '';
+        }
+        let idx = fileName.lastIndexOf('.');
+        
+        if(idx === -1){
+            return fileName;//没有'.'
+        }
+        let res = fileName.substring(0, idx);
+        return res;
+    }
+
+    /**
+     * 获取文件的后缀；如输入：abc.jpg => jpg
+     * @param fileName 
+     * @returns 
+     */
+    public static getFileSuffix(fileName: string): string{
+        if (fileName.length == 0) {
+            return '';
+        }
+        let idx = fileName.lastIndexOf('.');
+        if(idx === -1){
+            return '';//没有'.'
+        }
+        let res = fileName.substring(idx+1);
+        return res;
+    }
+
+    /**
      * 输入全路径，返回除去文件名的路径
      * @param path 
      * @param sep 
@@ -216,7 +257,7 @@ export class FileNameOrPathHelper {
             return '';
         }
         let sp = path.split(sep);
-        console.log('getPath方法，sp：', sp);
+        //console.log('getPath方法，sp：', sp);
 
         let res = '';
         for (let i = 0; i < sp.length - 1; i++) {//从0到倒数第二项遍历

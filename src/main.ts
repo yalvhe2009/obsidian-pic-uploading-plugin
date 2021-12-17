@@ -4,12 +4,7 @@ import { ClipBoardHelper, ClipBoardReadOutput } from './clipBoardHelper';
 import { CloudServiceProviderType } from './enums';
 import { OssFactory } from './ossFactory';
 import { FileNameOrPathHelper, GetFileNameByRuleInput } from './fileNameHelper';
-import {Md5} from "md5-typescript";
 import file2md5 from 'file2md5';
-
-
-
-// Remember to rename these classes and interfaces!
 
 interface PicUploadPluginSettings {
 
@@ -47,73 +42,48 @@ const DEFAULT_SETTINGS: PicUploadPluginSettings = {
 	isAutoPaste: 'true',
 }
 
+
 export default class PicUploadingPlugin extends Plugin {
 	ossUploadImpl: PUOss;
 	settings: PicUploadPluginSettings;
+	picUploadingModal: PicUploadingModal;
 
 	async onload() {
 		await this.loadSettings();
-		
-		let typeInt:number = parseInt(this.settings.cloudServiceProviderType);
+
+		let typeInt: number = parseInt(this.settings.cloudServiceProviderType);
 		this.ossUploadImpl = OssFactory.getOssImplObject(typeInt, this.settings.ossProviderSettingsJson);
-		if(this.ossUploadImpl == null){
+		if (this.ossUploadImpl == null) {
 			new Notice(`Error, oss provider [${CloudServiceProviderType[typeInt]}] has not implemented! May be implemented it in future!`)
 		}
-		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Picture Uploading Plugin', (evt: MouseEvent) => {
-			new PicUploadingModal(this.app, this).open();
+			this.picUploadingModal = new PicUploadingModal(this.app, this);
+			this.picUploadingModal.open();
 		});
-		// Perform additional things with the ribbon
-		//ribbonIconEl.addClass('my-plugin-ribbon-class');
-
+		
 		const statusBarItemEl = this.addStatusBarItem();
 		statusBarItemEl.setText('Upload from clipboard');
 		statusBarItemEl.addEventListener('click', async (event) => {
 			const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-			if (markdownView) {
-				let doc = markdownView.editor.getDoc();
-				console.log('当前Markdown路径为：', markdownView.file.path)
-			}
-			
 			let readImageOutput: ClipBoardReadOutput = await ClipBoardHelper.readImage();
-			let file: Blob = readImageOutput.file;
-			let file2: File = new File([file], 'PasteFile.png', {type: 'image/png', lastModified: Date.now()});
-			let md5Val =  await file2md5(file2, {chunkSize: 3 * 1024 * 1024});
-			// console.log('Md5值为：', md5Val);
-			
-			let getFileNameByRuleInput: GetFileNameByRuleInput = {
-				rule: this.settings.fileNameFormat,
-				imgPath: '',//当前版本暂不实现
-				markdownPath: markdownView.file.path,
-				originFileName: 'PasteFile.png',//稍后填充
-				fileMd5: md5Val,
-			};
-
-			//把规则转换为文件路径
-			let fileName = FileNameOrPathHelper.getFileNameOrPathByRule(getFileNameByRuleInput);
-			// console.log('读取到的文件为', file);
-			console.log(`上传前文件名为：${fileName}`);
-			
-
-			if (file) {
-				let ossUploadInput: PUOssUploadInput = {
-					file: file,
-					fileName: fileName
-				};
-				new Notice(`Start to upload file!`);
-				let ossUploadOutput = await this.ossUploadImpl.upload(ossUploadInput);
-				console.log("ossUploadOutput", ossUploadOutput);
-
-				if (ossUploadOutput.success) {
-					new Notice('File upload succeed!');
-					ClipBoardHelper.writeText(`![](${ossUploadOutput.data})`);
-				}
-				else {
-					new Notice(`File upload faild! detail: ${ossUploadOutput.msg}`);
-				}
-			} else {
-				new Notice('Can not find image from your clipboard!');
+			if (readImageOutput.file == null) {
+				new Notice("Error, Can't find image from your clipboard!");
+				return;				
 			}
+			let file: Blob = readImageOutput.file;
+			let file2: File = new File([file], 'PasteFile.png', { type: 'image/png', lastModified: Date.now() });
+
+			if (this.settings.isRenameBeforeUpload === 'true') {
+				//打开确认对话框
+				new ConfirmFileNameModal(this.app, this, file2).open();
+			}
+			else {
+				//直接上传
+				let fullPath: string = await MainHelper.getFullPathByRule(file2, markdownView, this.settings);
+				let isAutoPaste = this.settings.isAutoPaste === 'true';
+				await MainHelper.upload(file2, this.ossUploadImpl, markdownView,fullPath, isAutoPaste);
+			}
+
 		});
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
@@ -142,40 +112,72 @@ class PicUploadingModal extends Modal {
 
 	onOpen() {
 		const { contentEl } = this;
-		let div1 = contentEl.createDiv({ cls: 'p-t-s' });
-		div1.createEl('label', { attr: { for: 'custom-file-name' }, text: 'Custom File Name:' });//自定义文件名
-		let fileNameInput = div1.createEl('input', { type: 'text', attr: { id: 'custom-file-name' }, cls: 'pic-uploading-plugin-input' });//自定义文件名
-		let div2 = contentEl.createDiv({ cls: 'p-t-s' });
-		div2.createEl('label', { attr: { for: 'pic-file' }, text: 'File:' });
-		let fileInput = div2.createEl('input', { type: 'file', attr: { id: 'pic-file' }, cls: 'pic-uploading-plugin-input' });//文件选择组件
-		let div3 = contentEl.createDiv({ cls: 'p-t-s' });
-		div3.createEl('label', { attr: { for: 'url-of-file' }, text: 'URL of File:' });
-		let urlInput = div3.createEl('input', { type: 'text', attr: { id: 'url-of-file' }, cls: 'pic-uploading-plugin-input' });//文件上传成功后的url
+		let div2 = contentEl.createDiv({ cls: '' });
+		let a = div2.createEl('a', { cls: 'pu-file', text: 'Click to upload file.' });
+		let fileInput = a.createEl('input', { type: 'file', attr: { id: 'pic-file' }, cls: '' });//文件选择组件
+
 		fileInput.addEventListener('change', async (event: Event) => {
-			console.log(event);
 			let files = fileInput.files;
 			let file: File = files.length > 0 ? files[0] : null;
 			console.log(file);
-
-			if (file) {
-				let ossUploadInput: PUOssUploadInput = {
-					file: file,
-					fileName: 'defaultFileName'
-				};
-				let ossUploadOutput = await this.plugin.ossUploadImpl.upload(ossUploadInput);
-				console.log("ossUploadOutput", ossUploadOutput);
-
-				if (ossUploadOutput.success) {
-					new Notice('File upload succeed!');
-					ClipBoardHelper.writeText(`![](${ossUploadOutput.data})`);
-				}
-				else {
-					new Notice(`File upload faild! detail: ${ossUploadOutput.msg}`);
-				}
-			} else {
-				new Notice('File object is null!');
+			const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+			if (this.plugin.settings.isRenameBeforeUpload === 'true') {
+				//打开确认对话框
+				new ConfirmFileNameModal(this.app, this.plugin, file).open();
 			}
+			else {
+				//直接上传
+				let isAutoPaste = this.plugin.settings.isAutoPaste === 'true';
+				let fullPath: string = await MainHelper.getFullPathByRule(file, markdownView, this.plugin.settings);
+				await MainHelper.upload(file, this.plugin.ossUploadImpl, markdownView, fullPath, isAutoPaste);
+			}
+			
+		});
+	}
 
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
+class ConfirmFileNameModal extends Modal {
+	plugin: PicUploadingPlugin;
+	file: File;
+	constructor(app: App, plugin: PicUploadingPlugin, file: File) {
+		super(app);
+		this.plugin = plugin;
+		this.file = file;
+	}
+
+	async onOpen(): Promise<void> {
+		const { contentEl } = this;
+		const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		let fullPath: string = await MainHelper.getFullPathByRule(this.file, markdownView, this.plugin.settings);
+		let fileName: string = FileNameOrPathHelper.getFileName(fullPath);
+		let filePath: string = FileNameOrPathHelper.getPath(fullPath);
+
+		let div1 = contentEl.createDiv({cls: 'p-t-s'});
+		div1.createEl('label', { attr: { for: 'file-path' }, text: 'File Path:' });
+		let filePathInput = div1.createEl('input', { type: 'text', value: filePath, attr: { id: 'file-path' } });
+
+		let div2 = contentEl.createDiv({cls: 'p-t-s'});
+		div2.createEl('label', { attr: { for: 'file-name' }, text: 'File Name:' });
+		let fileNameInput = div2.createEl('input', { type: 'text', value: fileName, attr: { id: 'file-name' } });
+
+
+
+		let confirmDiv = contentEl.createDiv({});
+		let okBtn = confirmDiv.createEl('input', { type: 'button', value: 'OK', cls: 'pu-btn' });
+		okBtn.addEventListener('click', async (event) => {
+			let modifiedFullName = FileNameOrPathHelper.joinPath(filePathInput.value, fileNameInput.value);//修改过后的全路径文件名
+			okBtn.disabled = true;//锁定按键，防止重复按下
+			let isAutoPaste = this.plugin.settings.isAutoPaste === 'true';
+			await MainHelper.upload(this.file, this.plugin.ossUploadImpl, markdownView, modifiedFullName, isAutoPaste);
+			this.close();
+			if (this.plugin.picUploadingModal != null) {
+				this.plugin.picUploadingModal.close();//关闭文件选择对话框
+			}
 		});
 	}
 
@@ -198,7 +200,7 @@ class PicUploadingSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: 'OSS Provider Setting' });
+		containerEl.createEl('h2', { text: 'Obsidian Picture Uploading Plugin Setting' });
 
 
 		new Setting(containerEl)
@@ -214,7 +216,7 @@ class PicUploadingSettingTab extends PluginSettingTab {
 				}
 
 				dropdown.setValue(this.plugin.settings.cloudServiceProviderType);
-				dropdown.onChange(async (value)=>{
+				dropdown.onChange(async (value) => {
 					this.plugin.settings.cloudServiceProviderType = value;
 					await this.plugin.saveSettings();
 				})
@@ -234,7 +236,7 @@ class PicUploadingSettingTab extends PluginSettingTab {
 					})
 			});
 
-			new Setting(containerEl)
+		new Setting(containerEl)
 			.setName('paste automatically after upload')
 			.setDesc('If you set it true, this plugin will paste markdown image text after upload.')
 			.addDropdown(dropdown => {
@@ -246,7 +248,7 @@ class PicUploadingSettingTab extends PluginSettingTab {
 				});
 			});
 
-			new Setting(containerEl)
+		new Setting(containerEl)
 			.setName('rename before upload')
 			.setDesc('If you set it true, this plugin will popup a dialog that you can change the filename.')
 			.addDropdown(dropdown => {
@@ -258,16 +260,76 @@ class PicUploadingSettingTab extends PluginSettingTab {
 				});
 			});
 
-			new Setting(containerEl)
+		new Setting(containerEl)
 			.setName('File name foramt')
 			.setDesc('')
-			.addText(text =>{
+			.addText(text => {
 				text.setValue(this.plugin.settings.fileNameFormat)
-				.onChange(async val =>{
-					this.plugin.settings.fileNameFormat = val;
-					await this.plugin.saveSettings();
-				});
+					.onChange(async val => {
+						this.plugin.settings.fileNameFormat = val;
+						await this.plugin.saveSettings();
+					});
 			});
+
+	}
+}
+
+/**
+ * 主程序的Helper
+ */
+export class MainHelper{
+	public static async getFullPathByRule(file: File, markdownView: MarkdownView, settings: PicUploadPluginSettings): Promise<string> {
+		if (file == null) {
+			throw new Error("Error, file object is null!");
+		}
+		if (markdownView == null) {
+			throw new Error("Error, please open a markdown file first!");
+		}
+		let md5Val = await file2md5(file, { chunkSize: 3 * 1024 * 1024 });
+
+		let getFileNameByRuleInput: GetFileNameByRuleInput = {
+			rule: settings.fileNameFormat,
+			imgPath: '',//当前版本暂不实现
+			markdownPath: markdownView.file.path,
+			originFileName: file.name,//原始文件名
+			fileMd5: md5Val,
+		};
+
+		//把规则转换为文件路径
+		let fileName = FileNameOrPathHelper.getFileNameOrPathByRule(getFileNameByRuleInput);
+		console.log('getFullPathByRule响应：', fileName);
+		return fileName;
+	}
+
+
+	public static async upload(file: File, ossUploadImpl: PUOss, markdownView: MarkdownView, newFileName: string='', autoPaste: boolean=false) {
+		if (file) {
+			if (newFileName.length == 0) {
+				newFileName = file.name;
+			}
+			console.log('上传前的文件名：', newFileName);
+
+			let ossUploadInput: PUOssUploadInput = {
+				file: file,
+				fileName: newFileName
+			};
+			let ossUploadOutput = await ossUploadImpl.upload(ossUploadInput);
+			console.log("ossUploadOutput", ossUploadOutput);
+
+			if (ossUploadOutput.success) {
+				new Notice('File upload succeed!');
+				let markdownPicPath: string= `![](${ossUploadOutput.data})`;
+				ClipBoardHelper.writeText(markdownPicPath);
+				if (autoPaste) {//上传完成后是否自动粘贴
+					markdownView.editor.replaceSelection(markdownPicPath);
+				}
+			}
+			else {
+				new Notice(`File upload faild! detail: ${ossUploadOutput.msg}`);
+			}
+		} else {
+			new Notice('File object is null!');
+		}
 
 	}
 }
