@@ -164,11 +164,11 @@ class ConfirmFileNameModal extends Modal {
 		
 		let div1 = contentEl.createDiv({cls: 'p-t-s'});
 		div1.createEl('label', { attr: { for: 'file-path' }, text: 'File Path:' });
-		let filePathInput = div1.createEl('input', { type: 'text', value: filePath, attr: { id: 'file-path' } });
+		let filePathInput = div1.createEl('input', { type: 'text', value: filePath, attr: { id: 'file-path'}, cls: 'middle-width' });
 
 		let div2 = contentEl.createDiv({cls: 'p-t-s'});
 		div2.createEl('label', { attr: { for: 'file-name' }, text: 'File Name:' });
-		let fileNameInput = div2.createEl('input', { type: 'text', value: fileName, attr: { id: 'file-name' } });
+		let fileNameInput = div2.createEl('input', { type: 'text', value: fileName, attr: { id: 'file-name' }, cls: 'middle-width' });
 
 
 
