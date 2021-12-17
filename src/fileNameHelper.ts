@@ -36,10 +36,8 @@ export class FileNameOrPathHelper {
         //rule传入格式样例：fix-dir/{currMarkdownFolder:2}{picFolder:2}/{y}/{m}/{d}/{h}-{i}-{s}-{hash}-{origin}-{rand:6}
 
         let originFileName = FileNameOrPathHelper.getFileNameExcludeSuffix(input.originFileName);
-		let fileSuffix = FileNameOrPathHelper.getFileSuffix(input.originFileName);
-        
-        console.log('原始文件名和文件后缀：', `${originFileName}哈哈${fileSuffix}`);
-        
+        let fileSuffix = FileNameOrPathHelper.getFileSuffix(input.originFileName);
+
         //console.log('处理currMarkdownFolder前的rule：', input.rule);
 
         //1.查找{currMarkdownFolder}或{currMarkdownFolder:x}
@@ -111,17 +109,17 @@ export class FileNameOrPathHelper {
             //console.log('匹配到的项目：', m2);
             //匹配到了：{rand:x}
             let num: number = parseInt(m2[1]);//num 表示：{rand:x}中的x的值
-            if(num <=0 || num > 10){
+            if (num <= 0 || num > 10) {
                 throw new Error("Configuration error, num should > 0 or <= 10 in format: '{rand:num}'!");
             }
-            let randMin = (10)**(num - 1);
-            let randMax = (9.999999999)*(10)**(num - 1);
+            let randMin = (10) ** (num - 1);
+            let randMax = (9.999999999) * (10) ** (num - 1);
             //console.log(`${randMin}, ${randMax}`);
-            
+
             let randNum: Number = this.getRandomNum(randMin, randMax);//num位数
             let s1 = input.rule.substring(0, m2.index);
             let s2 = input.rule.substring(m2.index + m2[0].length);
-            input.rule = s1 + `${randNum}`+ s2;
+            input.rule = s1 + `${randNum}` + s2;
             //console.log('Rule为：', input.rule);
 
         }
@@ -214,13 +212,13 @@ export class FileNameOrPathHelper {
      * @param fileName 
      * @returns 
      */
-    public static getFileNameExcludeSuffix(fileName: string): string{
+    public static getFileNameExcludeSuffix(fileName: string): string {
         if (fileName.length == 0) {
             return '';
         }
         let idx = fileName.lastIndexOf('.');
-        
-        if(idx === -1){
+
+        if (idx === -1) {
             return fileName;//没有'.'
         }
         let res = fileName.substring(0, idx);
@@ -232,15 +230,15 @@ export class FileNameOrPathHelper {
      * @param fileName 
      * @returns 
      */
-    public static getFileSuffix(fileName: string): string{
+    public static getFileSuffix(fileName: string): string {
         if (fileName.length == 0) {
             return '';
         }
         let idx = fileName.lastIndexOf('.');
-        if(idx === -1){
+        if (idx === -1) {
             return '';//没有'.'
         }
-        let res = fileName.substring(idx+1);
+        let res = fileName.substring(idx + 1);
         return res;
     }
 
@@ -257,18 +255,21 @@ export class FileNameOrPathHelper {
             return '';
         }
         let sp = path.split(sep);
-        //console.log('getPath方法，sp：', sp);
+        console.log('getPath方法，sp：', sp);
 
         let res = '';
         for (let i = 0; i < sp.length - 1; i++) {//从0到倒数第二项遍历
             const item = sp[i];
             if (item.length == 0) {// /a/b/c.jpg => ['', 'a', 'b', 'c.jpg']=>/a/b
-                res += sep;
+                continue;
             }
             else {
                 res += `${sep}${item}`;
             }
 
+        }
+        if (sp[0] !== '') {//   a/b/c.jpg => ['a', 'b', 'c.jpg']，但此时为：/a/b/c.jpg
+            res = res.substring(1);
         }
         return res;
     }

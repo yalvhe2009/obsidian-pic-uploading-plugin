@@ -154,9 +154,14 @@ class ConfirmFileNameModal extends Modal {
 		const { contentEl } = this;
 		const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
 		let fullPath: string = await MainHelper.getFullPathByRule(this.file, markdownView, this.plugin.settings);
+		// console.log('全部的路径为：', fullPath);
+		
 		let fileName: string = FileNameOrPathHelper.getFileName(fullPath);
 		let filePath: string = FileNameOrPathHelper.getPath(fullPath);
-
+		// console.log('fileName', fileName);
+		// console.log('filePath', filePath);
+		
+		
 		let div1 = contentEl.createDiv({cls: 'p-t-s'});
 		div1.createEl('label', { attr: { for: 'file-path' }, text: 'File Path:' });
 		let filePathInput = div1.createEl('input', { type: 'text', value: filePath, attr: { id: 'file-path' } });
@@ -294,10 +299,11 @@ export class MainHelper{
 			originFileName: file.name,//原始文件名
 			fileMd5: md5Val,
 		};
-
+		//console.log('获取文件路径规则的输入：', getFileNameByRuleInput);
+		
 		//把规则转换为文件路径
 		let fileName = FileNameOrPathHelper.getFileNameOrPathByRule(getFileNameByRuleInput);
-		console.log('getFullPathByRule响应：', fileName);
+		//console.log('getFullPathByRule响应：', fileName);
 		return fileName;
 	}
 
@@ -307,14 +313,14 @@ export class MainHelper{
 			if (newFileName.length == 0) {
 				newFileName = file.name;
 			}
-			console.log('上传前的文件名：', newFileName);
+			//console.log('上传前的文件名：', newFileName);
 
 			let ossUploadInput: PUOssUploadInput = {
 				file: file,
 				fileName: newFileName
 			};
 			let ossUploadOutput = await ossUploadImpl.upload(ossUploadInput);
-			console.log("ossUploadOutput", ossUploadOutput);
+			//console.log("ossUploadOutput", ossUploadOutput);
 
 			if (ossUploadOutput.success) {
 				new Notice('File upload succeed!');
