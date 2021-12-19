@@ -1,5 +1,5 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
-import { PUOss, PUOssUploadInput } from './interfaces';
+import { PUOss, PUOssDeleteInput, PUOssDeleteOutput, PUOssUploadInput } from './interfaces';
 import { ClipBoardHelper, ClipBoardReadOutput } from './clipBoardHelper';
 import { CloudServiceProviderType } from './enums';
 import { OssFactory } from './ossFactory';
@@ -60,7 +60,7 @@ export default class PicUploadingPlugin extends Plugin {
 			this.picUploadingModal = new PicUploadingModal(this.app, this);
 			this.picUploadingModal.open();
 		});
-		
+
 		const statusBarItemEl = this.addStatusBarItem();
 		statusBarItemEl.setText('Upload from clipboard');
 		statusBarItemEl.addEventListener('click', async (event) => {
@@ -68,7 +68,7 @@ export default class PicUploadingPlugin extends Plugin {
 			let readImageOutput: ClipBoardReadOutput = await ClipBoardHelper.readImage();
 			if (readImageOutput.file == null) {
 				new Notice("Error, Can't find image from your clipboard!");
-				return;				
+				return;
 			}
 			let file: Blob = readImageOutput.file;
 			let file2: File = new File([file], 'PasteFile.png', { type: 'image/png', lastModified: Date.now() });
@@ -81,9 +81,34 @@ export default class PicUploadingPlugin extends Plugin {
 				//直接上传
 				let fullPath: string = await MainHelper.getFullPathByRule(file2, markdownView, this.settings);
 				let isAutoPaste = this.settings.isAutoPaste === 'true';
-				await MainHelper.upload(file2, this.ossUploadImpl, markdownView,fullPath, isAutoPaste);
+				await MainHelper.upload(file2, this.ossUploadImpl, markdownView, fullPath, isAutoPaste);
 			}
 
+		});
+
+		this.addCommand({
+			id: 'obsidian-pic-uploading-delete',
+			name: 'Delete Selected Picture',
+			editorCallback: async (editor: Editor, view: MarkdownView) => {
+				console.log();
+				let selectedText: string = editor.getSelection();
+				if (selectedText.length === 0) {
+					new Notice('Error, you should select text first!');
+					return;
+				}
+
+				let deleteInput: PUOssDeleteInput = {
+					fileFullPath: selectedText
+				}
+				let output: PUOssDeleteOutput = await this.ossUploadImpl.delete(deleteInput);
+				if (output.success) {
+					new Notice(output.msg);
+					editor.replaceSelection('');//把选中内容替换为空；
+				}
+				else {
+					new Notice(`Delete error, ${output.msg}`);
+				}
+			}
 		});
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
@@ -131,7 +156,7 @@ class PicUploadingModal extends Modal {
 				let fullPath: string = await MainHelper.getFullPathByRule(file, markdownView, this.plugin.settings);
 				await MainHelper.upload(file, this.plugin.ossUploadImpl, markdownView, fullPath, isAutoPaste);
 			}
-			
+
 		});
 	}
 
@@ -155,18 +180,18 @@ class ConfirmFileNameModal extends Modal {
 		const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
 		let fullPath: string = await MainHelper.getFullPathByRule(this.file, markdownView, this.plugin.settings);
 		// console.log('全部的路径为：', fullPath);
-		
+
 		let fileName: string = FileNameOrPathHelper.getFileName(fullPath);
 		let filePath: string = FileNameOrPathHelper.getPath(fullPath);
 		// console.log('fileName', fileName);
 		// console.log('filePath', filePath);
-		
-		
-		let div1 = contentEl.createDiv({cls: 'p-t-s'});
-		div1.createEl('label', { attr: { for: 'file-path' }, text: 'File Path:' });
-		let filePathInput = div1.createEl('input', { type: 'text', value: filePath, attr: { id: 'file-path'}, cls: 'middle-width' });
 
-		let div2 = contentEl.createDiv({cls: 'p-t-s'});
+
+		let div1 = contentEl.createDiv({ cls: 'p-t-s' });
+		div1.createEl('label', { attr: { for: 'file-path' }, text: 'File Path:' });
+		let filePathInput = div1.createEl('input', { type: 'text', value: filePath, attr: { id: 'file-path' }, cls: 'middle-width' });
+
+		let div2 = contentEl.createDiv({ cls: 'p-t-s' });
 		div2.createEl('label', { attr: { for: 'file-name' }, text: 'File Name:' });
 		let fileNameInput = div2.createEl('input', { type: 'text', value: fileName, attr: { id: 'file-name' }, cls: 'middle-width' });
 
@@ -282,7 +307,7 @@ class PicUploadingSettingTab extends PluginSettingTab {
 /**
  * 主程序的Helper
  */
-export class MainHelper{
+export class MainHelper {
 	public static async getFullPathByRule(file: File, markdownView: MarkdownView, settings: PicUploadPluginSettings): Promise<string> {
 		if (file == null) {
 			throw new Error("Error, file object is null!");
@@ -300,7 +325,7 @@ export class MainHelper{
 			fileMd5: md5Val,
 		};
 		//console.log('获取文件路径规则的输入：', getFileNameByRuleInput);
-		
+
 		//把规则转换为文件路径
 		let fileName = FileNameOrPathHelper.getFileNameOrPathByRule(getFileNameByRuleInput);
 		//console.log('getFullPathByRule响应：', fileName);
@@ -308,7 +333,7 @@ export class MainHelper{
 	}
 
 
-	public static async upload(file: File, ossUploadImpl: PUOss, markdownView: MarkdownView, newFileName: string='', autoPaste: boolean=false) {
+	public static async upload(file: File, ossUploadImpl: PUOss, markdownView: MarkdownView, newFileName: string = '', autoPaste: boolean = false) {
 		if (file) {
 			if (newFileName.length == 0) {
 				newFileName = file.name;
@@ -324,7 +349,7 @@ export class MainHelper{
 
 			if (ossUploadOutput.success) {
 				new Notice('File upload succeed!');
-				let markdownPicPath: string= `![](${ossUploadOutput.data})`;
+				let markdownPicPath: string = `![](${ossUploadOutput.data})`;
 				ClipBoardHelper.writeText(markdownPicPath);
 				if (autoPaste) {//上传完成后是否自动粘贴
 					markdownView.editor.replaceSelection(markdownPicPath);
