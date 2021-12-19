@@ -102,7 +102,7 @@ export default class PicUploadingPlugin extends Plugin {
 				}
 				let output: PUOssDeleteOutput = await this.ossUploadImpl.delete(deleteInput);
 				if (output.success) {
-					new Notice(output.msg);
+					new Notice('Delete succeed!');
 					editor.replaceSelection('');//把选中内容替换为空；
 				}
 				else {
