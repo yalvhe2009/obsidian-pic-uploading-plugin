@@ -5,6 +5,7 @@ import { CloudServiceProviderType } from './enums';
 import { OssFactory } from './ossFactory';
 import { FileNameOrPathHelper, GetFileNameByRuleInput } from './fileNameHelper';
 import file2md5 from 'file2md5';
+import { addIcons } from './icons';
 
 interface PicUploadPluginSettings {
 
@@ -56,7 +57,10 @@ export default class PicUploadingPlugin extends Plugin {
 		if (this.ossUploadImpl == null) {
 			new Notice(`Error, oss provider [${CloudServiceProviderType[typeInt]}] has not implemented! May be implemented it in future!`)
 		}
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Picture Uploading Plugin', (evt: MouseEvent) => {
+
+		addIcons();
+
+		const ribbonIconEl = this.addRibbonIcon('picUploadingPicture', 'Picture Uploading Plugin', (evt: MouseEvent) => {
 			this.picUploadingModal = new PicUploadingModal(this.app, this);
 			this.picUploadingModal.open();
 		});
