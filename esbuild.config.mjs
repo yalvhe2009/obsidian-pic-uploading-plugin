@@ -24,5 +24,5 @@ esbuild.build({
 	logLevel: "info",
 	sourcemap: prod ? false : 'inline',
 	treeShaking: true,
-	outfile: 'main.js',
+	outfile: 'C:/Users/yalvh/iCloudDrive/iCloud~md~obsidian/德明的Obsidian/.obsidian/plugins/obsidian-pic-uploading-plugin/main.js',
 }).catch(() => process.exit(1));
