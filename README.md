@@ -1,3 +1,3 @@
 ## Obsidian Picture Uploading Plugin
 
-A tool that helps you to upload picture to cloud service provider(oss), and I implemented the AliOss provider.
+A tool that helps you to upload picture to cloud service provider(oss), and I implemented the AliCloudOss provider.
